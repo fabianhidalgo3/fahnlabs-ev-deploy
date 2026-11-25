@@ -1,0 +1,16 @@
+{
+  "name": "emob-migrate-sqlite",
+  "version": "1.0.0",
+  "description": "One-off migration of the legacy SQLite database to PostgreSQL + MongoDB",
+  "type": "module",
+  "private": true,
+  "author": "Fabián Hidalgo",
+  "license": "UNLICENSED",
+  "scripts": {
+    "migrate": "node migrate.mjs"
+  },
+  "dependencies": {
+    "mongodb": "^7.0.0",
+    "pg": "^8.16.0"
+  }
+}

@@ -1,0 +1,130 @@
+# Production stack on one server: Caddy (HTTPS) → BFF + front, OCPP gateway → motor → PostgreSQL + MongoDB.
+# Only Caddy publishes ports (80/443); everything else stays on the internal network.
+#
+#   cd deploy && docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+#
+# Settings and secrets come from deploy/.env (see .env.example).
+name: emob
+
+x-restart: &restart
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+  caddy:
+    <<: *restart
+    image: caddy:2.10-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+      PUBLIC_IP: ${PUBLIC_IP}
+      UI_USER: ${UI_USER:-admin}
+      UI_PASSWORD_HASH: ${UI_PASSWORD_HASH}
+      SESSION_TOKEN: ${SESSION_TOKEN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [bff, gateway]
+
+  gateway:
+    <<: *restart
+    build: { context: ../.., dockerfile: ev-gateway/Dockerfile }
+    image: emob/gateway
+    environment:
+      GATEWAY_TOKEN: ${GATEWAY_TOKEN}
+    mem_limit: 256m
+
+  motor:
+    <<: *restart
+    build: { context: ../../ev-engine }
+    image: emob/motor
+    environment:
+      POSTGRES_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/?authSource=admin
+      GATEWAY_URL: http://gateway:9100
+      GATEWAY_TOKEN: ${GATEWAY_TOKEN}
+      MOTOR_TOKEN: ${MOTOR_TOKEN}
+      TZ: America/Santiago
+    depends_on:
+      postgres: { condition: service_healthy }
+      mongo: { condition: service_healthy }
+      gateway: { condition: service_started }
+    mem_limit: 512m
+
+  bff:
+    <<: *restart
+    build: { context: ../.., dockerfile: ev-bff/Dockerfile }
+    image: emob/bff
+    environment:
+      MOTOR_URL: http://motor:9200
+      MOTOR_TOKEN: ${MOTOR_TOKEN}
+      OCPP_PUBLIC_URL: https://${DOMAIN}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
+      GEMINI_FALLBACK_MODELS: ${GEMINI_FALLBACK_MODELS:-}
+      TZ: America/Santiago
+    depends_on: [motor]
+    mem_limit: 1g
+
+  postgres:
+    <<: *restart
+    image: postgres:19-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    mem_limit: 512m
+
+  mongo:
+    <<: *restart
+    image: mongo:9.0
+    command: ["--wiredTigerCacheSizeGB", "1"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    mem_limit: 2g
+
+  # Demo chargers: the fleet simulator runs inside the stack and keeps 6 emulated chargers (PATIO-01…06) charging
+  # cars around the clock. Start/stop: docker compose -f docker-compose.prod.yml --profile demo up -d fleet / stop fleet
+  fleet:
+    <<: *restart
+    image: node:24-alpine
+    profiles: ["demo"]
+    working_dir: /emu
+    volumes:
+      - ../emulators:/emu:ro
+    environment:
+      MOTOR_TOKEN: ${MOTOR_TOKEN}
+      TZ: America/Santiago
+    command: >
+      sh -c "while true; do node fleet/fleet.js --url ws://gateway:9100/ocpp --api http://motor:9200
+      --chargers 6 --connectors 2 --speed 20 --duration 60 --arrival 0.4 --prefix PATIO --quiet; sleep 5; done"
+    depends_on: [motor, gateway]
+    mem_limit: 256m
+
+volumes:
+  pgdata:
+  mongodata:
+  caddy_data:
+  caddy_config:

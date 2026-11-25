@@ -1,0 +1,48 @@
+# Databases of the motor (domain service).
+#   PostgreSQL: master data (vehicles, chargers)
+#   MongoDB:    operational data (sessions, charging plans, meter values, yard samples, OCPP log, events)
+#
+#   docker compose up -d          # start
+#   docker compose down           # stop (data is kept in the named volumes)
+#
+# Credentials and host ports come from .env (see .env.example); the defaults are for local development only.
+# Host ports 5442/27027 avoid clashing with other local databases on 5432/27017.
+name: emob
+
+services:
+  postgres:
+    image: postgres:19-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-emob}
+      POSTGRES_USER: ${POSTGRES_USER:-emob}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-emob-dev}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5442}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mongo:
+    image: mongo:9.0
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-emob}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-emob-dev}
+    ports:
+      - "127.0.0.1:${MONGO_PORT:-27027}:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  pgdata:
+  mongodata:

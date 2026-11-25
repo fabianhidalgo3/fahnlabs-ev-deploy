@@ -1,0 +1,1 @@
+{"name":"emob-capturas","private":true,"type":"module","scripts":{"capturas":"node capturas.mjs"},"dependencies":{"puppeteer-core":"^24.43.1"}}

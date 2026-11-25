@@ -1,0 +1,68 @@
+# Public entry point.
+#   /ocpp/*         → OCPP gateway (charge points; no browser login, they cannot answer it)
+#   /emulator/*     → OCPP gateway, behind the login
+#   everything else → BFF (dashboard, REST API, /ws/live, Swagger), behind the login
+#
+# {$DOMAIN}: certificate from Let's Encrypt (needs the DNS record).
+# {$PUBLIC_IP}: temporary access by IP while DNS is not ready — self-signed certificate (browser warning) on 443,
+#               and plain ws:// OCPP on port 80 for test chargers.
+# Certificates are requested without an e-mail (Let's Encrypt allows it; no expiry notices).
+{
+	default_sni {$PUBLIC_IP}
+}
+
+(routes) {
+	@emulator path /emulator /emulator/*
+	handle @emulator {
+		reverse_proxy gateway:9100
+	}
+	handle {
+		reverse_proxy bff:9000
+	}
+}
+
+(app) {
+	encode zstd gzip
+
+	@ocpp path /ocpp/*
+	handle @ocpp {
+		reverse_proxy gateway:9100
+	}
+
+	# No login: the owner chose an open dashboard for now (anyone with the address can see and operate it).
+	# To protect it again, wrap "import routes" in a handle with basic_auth {$UI_USER} {$UI_PASSWORD_HASH}.
+	handle {
+		import routes
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
+
+{$DOMAIN} {
+	import app
+	header Strict-Transport-Security "max-age=31536000"
+}
+
+https://{$PUBLIC_IP} {
+	tls internal
+	import app
+}
+
+http://{$PUBLIC_IP} {
+	@ocpp path /ocpp/*
+	handle @ocpp {
+		reverse_proxy gateway:9100
+	}
+	handle {
+		redir https://{host}{uri}
+	}
+}
