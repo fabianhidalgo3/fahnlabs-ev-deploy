@@ -21,7 +21,7 @@ in Caddy); the OCPP endpoint does not, because charge points cannot answer it (O
 | Open ports | 80 and 443 (plus your SSH port); SSH with keys only |
 | Public URL | `https://${DOMAIN}` (DNS A record → server IP) |
 | Charge points | `wss://${DOMAIN}/ocpp/{chargePointId}` |
-| App folder | `/opt/emob` (the five repositories side by side), `/opt/emob/ev-deploy/deploy/.env` (secrets, mode 600) |
+| App folder | `/opt/emob` (the five repositories side by side), `/opt/emob/fahnlabs-ev-deploy/deploy/.env` (secrets, mode 600) |
 | Dashboard login | HTTP basic auth in Caddy (`UI_USER`, `UI_PASSWORD_HASH`) |
 
 ## Images
@@ -30,9 +30,9 @@ The Docker context is the folder that holds the five repositories.
 
 | Service | Dockerfile | Context | Notes |
 |---|---|---|---|
-| gateway | `ev-gateway/Dockerfile` | parent folder | Go → distroless; includes the web emulator from `ev-deploy/emulators/web` (`EMULATOR_DIR=/app/emulators/web`) |
-| motor | `ev-engine/Dockerfile` | `ev-engine/` | Go → distroless; `POSTGRES_URL`, `MONGO_URI`, `GATEWAY_URL` set by compose |
-| bff | `ev-bff/Dockerfile` | parent folder | Node builds the front from `ev-web`, JDK 25 builds the jar, JRE 25 runs it (`FRONT_DIR=/app/front`) |
+| gateway | `fahnlabs-ev-gateway/Dockerfile` | parent folder | Go → distroless; includes the web emulator from `fahnlabs-ev-deploy/emulators/web` (`EMULATOR_DIR=/app/emulators/web`) |
+| motor | `fahnlabs-ev-engine/Dockerfile` | `fahnlabs-ev-engine/` | Go → distroless; `POSTGRES_URL`, `MONGO_URI`, `GATEWAY_URL` set by compose |
+| bff | `fahnlabs-ev-bff/Dockerfile` | parent folder | Node builds the front from `fahnlabs-ev-web`, JDK 25 builds the jar, JRE 25 runs it (`FRONT_DIR=/app/front`) |
 
 The BFF reports the public OCPP and emulator URLs from `OCPP_PUBLIC_URL` (`https://${DOMAIN}`).
 
@@ -43,9 +43,9 @@ On the server, clone or pull the five repositories into `/opt/emob` and rebuild:
 ```bash
 cd /opt/emob
 for r in ev-gateway ev-engine ev-bff ev-web ev-deploy; do
-  [ -d $r ] && git -C $r pull || git clone https://github.com/fabianhidalgo3/fahnlabs-$r.git $r
+  [ -d fahnlabs-$r ] && git -C fahnlabs-$r pull || git clone https://github.com/fabianhidalgo3/fahnlabs-$r.git
 done
-cd ev-deploy/deploy && docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+cd fahnlabs-ev-deploy/deploy && docker compose -f docker-compose.prod.yml --env-file .env up -d --build
 ```
 
 First deployment only: create `deploy/.env` on the server from [`deploy/.env.example`](../deploy/.env.example) with
@@ -58,7 +58,7 @@ The `fleet` service (compose profile `demo`) runs the fleet simulator inside the
 (60-minute runs at ×20, restarted automatically).
 
 ```bash
-cd /opt/emob/ev-deploy/deploy
+cd /opt/emob/fahnlabs-ev-deploy/deploy
 docker compose -f docker-compose.prod.yml --env-file .env --profile demo up -d fleet   # start
 docker compose -f docker-compose.prod.yml stop fleet                                    # stop
 ```

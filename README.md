@@ -71,32 +71,32 @@ Requirements: Docker (PostgreSQL + MongoDB), Go 1.27+, JDK 25, Node.js 24+ (fron
 Clone the five repositories side by side:
 
 ```bash
-mkdir ev && cd ev
+mkdir Development && cd Development
 for r in ev-gateway ev-engine ev-bff ev-web ev-deploy; do
-  git clone git@github.com:fabianhidalgo3/fahnlabs-$r.git $r
+  git clone git@github.com:fabianhidalgo3/fahnlabs-$r.git
 done
 ```
 
 ```
-ev/
-├── ev-gateway   OCPP gateway (Go)
-├── ev-engine    motor: CSMS logic, power allocation, data (Go)
-├── ev-bff       REST API for the UI + assistant (Spring Boot)
-├── ev-web       front (Angular)
-└── ev-deploy    this repository
+Development/
+├── fahnlabs-ev-gateway   OCPP gateway (Go)
+├── fahnlabs-ev-engine    motor: CSMS logic, power allocation, data (Go)
+├── fahnlabs-ev-bff       REST API for the UI + assistant (Spring Boot)
+├── fahnlabs-ev-web       front (Angular)
+└── fahnlabs-ev-deploy    this repository
 ```
 
 ```bash
-cd ev-deploy && docker compose up -d && cd ..          # databases (host ports 5442 / 27027)
+cd fahnlabs-ev-deploy && docker compose up -d && cd ..          # databases (host ports 5442 / 27027)
 
-cd ev-gateway && go build -o bin/gateway ./cmd/gateway && ./bin/gateway   # :9100 (chargers connect here)
-cd ev-engine && go build -o bin/motor ./cmd/motor && ./bin/motor          # :9200
-cd ev-web && npm install && npm run build                                 # built front
-cd ev-bff && FRONT_DIR=../ev-web/dist/front/browser ./mvnw spring-boot:run   # :9000, serves the front
+cd fahnlabs-ev-gateway && go build -o bin/gateway ./cmd/gateway && ./bin/gateway   # :9100 (chargers connect here)
+cd fahnlabs-ev-engine && go build -o bin/motor ./cmd/motor && ./bin/motor          # :9200
+cd fahnlabs-ev-web && npm install && npm run build                                 # built front
+cd fahnlabs-ev-bff && FRONT_DIR=../fahnlabs-ev-web/dist/front/browser ./mvnw spring-boot:run   # :9000, serves the front
 ```
 
-During front development: `cd ev-web && npm start` (http://localhost:4200, proxies `/api` and `/ws` to the BFF).
-The production build (`deploy/docker-compose.prod.yml`) uses the `ev/` folder as its Docker context.
+During front development: `cd fahnlabs-ev-web && npm start` (http://localhost:4200, proxies `/api` and `/ws` to the BFF).
+The production build (`deploy/docker-compose.prod.yml`) uses that parent folder as its Docker context.
 
 Test chargers:
 
@@ -106,14 +106,14 @@ node emulators/fleet/fleet.js --chargers 6 --connectors 2 --speed 20 --duration 
 ```
 
 Configuration (all optional; defaults match `docker-compose.yml`): copy `.env.example` to `.env` (databases, gateway,
-motor) and set the BFF variables (`ANTHROPIC_API_KEY`, `MOTOR_URL`, `MOTOR_TOKEN`) in a git-ignored `ev-bff/.env`.
+motor) and set the BFF variables (`ANTHROPIC_API_KEY`, `MOTOR_URL`, `MOTOR_TOKEN`) in a git-ignored `fahnlabs-ev-bff/.env`.
 
 Migrating data from the previous SQLite version: [`tools/migrate-sqlite`](tools/migrate-sqlite).
 
 ## Tests
 
 ```bash
-cd ev-engine && go test ./...      # allocation engine
+cd fahnlabs-ev-engine && go test ./...      # allocation engine
 ```
 
 Limit check: no yard sample may have `ev_w + building_w > limit_w` (Mongo `site_samples`).

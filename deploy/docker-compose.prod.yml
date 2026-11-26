@@ -34,7 +34,7 @@ services:
 
   gateway:
     <<: *restart
-    build: { context: ../.., dockerfile: ev-gateway/Dockerfile }
+    build: { context: ../.., dockerfile: fahnlabs-ev-gateway/Dockerfile }
     image: emob/gateway
     environment:
       GATEWAY_TOKEN: ${GATEWAY_TOKEN}
@@ -42,7 +42,7 @@ services:
 
   motor:
     <<: *restart
-    build: { context: ../../ev-engine }
+    build: { context: ../../fahnlabs-ev-engine }
     image: emob/motor
     environment:
       POSTGRES_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
@@ -59,7 +59,7 @@ services:
 
   bff:
     <<: *restart
-    build: { context: ../.., dockerfile: ev-bff/Dockerfile }
+    build: { context: ../.., dockerfile: fahnlabs-ev-bff/Dockerfile }
     image: emob/bff
     environment:
       MOTOR_URL: http://motor:9200
